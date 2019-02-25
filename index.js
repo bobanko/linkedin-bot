@@ -45,28 +45,31 @@ function delay(time = 1000) {
     tries: 0,
     fails: 0,
     scrolls: 0,
-    lastHTTPCodes: []
+    lastHTTPCodes: [],
+    cycles: 0
   };
 
-  // ACCEPT INVITATIONS
   const acceptInviteButtonSelector = '[data-control-name="accept"]';
-
-  while (await page.$(acceptInviteButtonSelector)) {
-    page.click(acceptInviteButtonSelector);
-    // todo: add total available
-    logUpdate(
-      "\naccepting incoming invitations",
-      `\n💛 invitations accepted: ${++stats.accepted}`
-    );
-    await delay();
-  }
-
-  console.log("---");
-
-  // SEND INVITATIONS
 
   const invtationLink =
     "https://www.linkedin.com/voyager/api/growth/normInvitations";
+
+  function logStats() {
+    logUpdate(
+      `\nStats:`,
+      `\n👥 friend request sent ${stats.tries}`,
+      `\n💚 friended: ${stats.friends}`,
+      `\n💔 failed: ${stats.fails}`,
+      `\n⬇️  scrolled: ${stats.scrolls}`,
+      `\n🌐 last HTTP codes: ${stats.lastHTTPCodes.slice(-3)}`,
+      `\n💛 invitations accepted: ${stats.accepted}`,
+      `\n🔁 cycles: ${stats.cycles}`
+    );
+  }
+
+  function codeIsOk(code) {
+    return /2\d{2}/.test(code);
+  }
 
   page.on("request", request => {
     if (request.resourceType() === "xhr") {
@@ -76,21 +79,6 @@ function delay(time = 1000) {
       }
     }
   });
-
-  function logStats() {
-    logUpdate(
-      `\nStats:`,
-      `\n👥 friend request sent ${stats.tries}`,
-      `\n💚 friended: ${stats.friends}`,
-      `\n💔 failed: ${stats.fails}`,
-      `\n⬇️  scrolled: ${stats.scrolls}`,
-      `\n🌐 last HTTP codes: ${stats.lastHTTPCodes.slice(-3)}`
-    );
-  }
-
-  function codeIsOk(code) {
-    return /2\d{2}/.test(code);
-  }
 
   page.on("response", response => {
     if (response.request().resourceType() === "xhr") {
@@ -112,30 +100,53 @@ function delay(time = 1000) {
     }
   });
 
-  while (stats.lastHTTPCodes.filter(c => !codeIsOk(c)).length < 10) {
-    await page.waitForSelector(inviteButtonSelector);
+  //todo: impl ctrl+c interruption here?
+  while (stats.cycles < 10) {
+    // ACCEPT INVITATIONS
+    while (await page.$(acceptInviteButtonSelector)) {
+      page.click(acceptInviteButtonSelector);
+      // todo: add total available
+      logUpdate(
+        "\naccepting incoming invitations",
+        `\n💛 invitations accepted: ${++stats.accepted}`
+      );
+      await delay();
+    }
 
-    page.click(inviteButtonSelector);
+    console.log("---");
 
-    // https://www.linkedin.com/voyager/api/growth/normInvitations
+    // SEND INVITATIONS
+    while (stats.lastHTTPCodes.filter(c => !codeIsOk(c)).length < 10) {
+      await page.waitForSelector(inviteButtonSelector);
 
-    page
-      .evaluate(() => {
-        const html = document.querySelector("html");
+      page.click(inviteButtonSelector);
 
-        if (html.scrollHeight < 2000) {
-          html.scrollTop = html.scrollHeight;
-          return true;
-        }
-      })
-      .then(isScrolled => {
-        if (isScrolled) {
-          stats.scrolls++;
-          logUpdate();
-        }
-      });
+      // https://www.linkedin.com/voyager/api/growth/normInvitations
 
-    await delay();
+      page
+        .evaluate(() => {
+          const html = document.querySelector("html");
+
+          if (html.scrollHeight < 2000) {
+            html.scrollTop = html.scrollHeight;
+            return true;
+          }
+        })
+        .then(isScrolled => {
+          if (isScrolled) {
+            stats.scrolls++;
+            logUpdate();
+          }
+        });
+
+      await delay();
+    }
+
+    //todo: wait 1 hr
+    const oneHour = 60 * 60 * 1000;
+    stats.cycles++;
+
+    await delay(oneHour);
   }
 
   await browser.close();
