@@ -39,8 +39,16 @@ function delay(time = 1000) {
 
   console.log("👥 /network/ page ready");
 
+  let stats = {
+    accepted: 0,
+    friends: 0,
+    tries: 0,
+    fails: 0,
+    scrolls: 0,
+    lastHTTPCodes: []
+  };
+
   // ACCEPT INVITATIONS
-  let accepted = 0;
   const acceptInviteButtonSelector = '[data-control-name="accept"]';
 
   while (await page.$(acceptInviteButtonSelector)) {
@@ -48,19 +56,14 @@ function delay(time = 1000) {
     // todo: add total available
     logUpdate(
       "\naccepting incoming invitations",
-      `\n💛 invitations accepted: ${++accepted}`
+      `\n💛 invitations accepted: ${++stats.accepted}`
     );
     await delay();
   }
 
-  console.log("");
+  console.log("---");
 
   // SEND INVITATIONS
-  let friends = 0;
-  let tries = 0;
-  let fails = 0;
-  let scrolls = 0;
-  let lastHTTPCodes = [];
 
   const invtationLink =
     "https://www.linkedin.com/voyager/api/growth/normInvitations";
@@ -68,7 +71,7 @@ function delay(time = 1000) {
   page.on("request", request => {
     if (request.resourceType() === "xhr") {
       if (request.url() === invtationLink) {
-        tries++;
+        stats.tries++;
         logStats();
       }
     }
@@ -77,11 +80,11 @@ function delay(time = 1000) {
   function logStats() {
     logUpdate(
       `\nStats:`,
-      `\n👥 friend request sent ${tries}`,
-      `\n💚 friended: ${friends}`,
-      `\n💔 failed: ${fails}`,
-      `\n⬇️  scrolled: ${scrolls}`,
-      `\n🌐 last HTTP codes: ${lastHTTPCodes.slice(-3)}`
+      `\n👥 friend request sent ${stats.tries}`,
+      `\n💚 friended: ${stats.friends}`,
+      `\n💔 failed: ${stats.fails}`,
+      `\n⬇️  scrolled: ${stats.scrolls}`,
+      `\n🌐 last HTTP codes: ${stats.lastHTTPCodes.slice(-3)}`
     );
   }
 
@@ -94,14 +97,14 @@ function delay(time = 1000) {
       if (response.request().url() === invtationLink) {
         // check status code to match 2xx
         if (codeIsOk(response.status())) {
-          friends++;
+          stats.friends++;
         } else {
-          fails++;
+          stats.fails++;
         }
-        lastHTTPCodes.push(response.status());
+        stats.lastHTTPCodes.push(response.status());
 
-        if (lastHTTPCodes.length > 20) {
-          lastHTTPCodes.shift();
+        if (stats.lastHTTPCodes.length > 20) {
+          stats.lastHTTPCodes.shift();
         }
 
         logStats();
@@ -109,7 +112,7 @@ function delay(time = 1000) {
     }
   });
 
-  while (lastHTTPCodes.filter(c => !codeIsOk(c)).length < 10) {
+  while (stats.lastHTTPCodes.filter(c => !codeIsOk(c)).length < 10) {
     await page.waitForSelector(inviteButtonSelector);
 
     page.click(inviteButtonSelector);
@@ -127,7 +130,7 @@ function delay(time = 1000) {
       })
       .then(isScrolled => {
         if (isScrolled) {
-          scrolls++;
+          stats.scrolls++;
           logUpdate();
         }
       });
